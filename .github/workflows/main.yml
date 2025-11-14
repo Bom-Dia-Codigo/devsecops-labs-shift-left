@@ -8,34 +8,17 @@ on:
   workflow_dispatch:
 
 env:
-  AZURE_FUNCTIONAPP_PACKAGE_PATH: '.'
-  PYTHON_VERSION: '3.12' 
+  AZURE_FUNCTIONAPP_PACKAGE_PATH: '.' # set this to the path to your web app project, defaults to the repository root
+  PYTHON_VERSION: '3.12' # set this to the python version to use (supports 3.6, 3.7, 3.8)
 
 jobs:
-  sast:    
+  cicd:    
     runs-on: ubuntu-latest
     permissions:
       contents: read
       id-token: write
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with: 
-          fetch-depth: 0
-
-      - name: Run Horusec
-        uses: Bom-Dia-Codigo/devsecops-horusec-action@v0.3.0
-        with:
-          path: ./
-          arguments: --log-level=debug --custom-rules-path=horusec-config.json
-  deploy:    
-    runs-on: ubuntu-latest    
-    permissions:
-      contents: read
-      id-token: write
-    needs: sast
-    steps:
-      - name: Checkout repository
+      - name: Git Checkout
         uses: actions/checkout@v4
         with: 
           fetch-depth: 0
@@ -45,8 +28,22 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
-      - name: Install dependencies (optional)
+      - name: Build
         run: pip install -r requirements.txt    
+
+      - name: SAST
+        uses: Bom-Dia-Codigo/devsecops-horusec-action@v0.3.0
+        with:
+          path: ./
+          arguments: --custom-rules-path=horusec-config.json #--log-level=debug 
+
+      - name: SCA
+        uses: snyk/actions/python-3.12@master
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          args:
+            --skip-unresolved=true  
         
       - name: Login to Azure
         uses: azure/login@v2
